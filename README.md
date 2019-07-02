@@ -98,6 +98,20 @@ I didn’t handle the “how do I write to one file” and instead wrote to mult
 
 This gives another 4.4X speedup on top of the pypy and handbuffering speedups. Unbuffered, this still gives a 2.8X speedup.
 
+#### Quickperm, Pools & Stdout
+
+After atom from hashcat threw down the gauntlet with his permute.c from hashcat-utils https://twitter.com/hashcat/status/1136294080835719168 I switched to the quickperm algorithm from https://gist.github.com/brianpursley/57bbaf0a8823e51012bc. That gave a 21% speedup on the default itertools.permutations. (I also moved to tracking number of generated permutations, rather than disk space used as the primary indicator)
+
+However, quickperm creates permutations of a fixed length (i.e. you send it 4 things, you'll get permutations of 4 things). So I used itertools.combinations to create different lists to send to quickperm.
+
+Previously, I had a problem with multiprocessing, that I didn't have an easy way to parallelise, and did it on the different lengths. However, in atom's case, he was permuting on a fixed length and I wanted to try optimise that use case as well. That gave me the idea of handing each list from combinations off to a different process. Which worked super well, and gave a 5.3x speedup!
+
+The problem was, if I wanted to do multiple lengths like the original permute, I quickly exceeded the OS's process limit. So I switched to using Pools instead of Processes from the multiprocessing library. That gave me similar speed across multiple lengths as I was getting on single lengths (same number of processes in each set to the number of cores in my laptop). Compared to my old permute approach, it gave a 1.8x speedup though!
+
+Finally, I tested writing to stdout rather than to multiple individual files for multiple lengths. I like the file approach, because I can generate the permutations once, then use the different lengths as I need them later. But, we want speed! Switching to stdout provided an additional 1.4x speedup!
+
+All in, for a fixed length of 12 and the '0123456789ab' charset, I got a speedup 7.2x over my previous approach (I don't think that number's a coincidence for an i7)! And for multiple lengths, I got a 2x speedup over my previous approach!
+
 ### What didn't work
 
 #### Not using strings
