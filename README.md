@@ -1,5 +1,5 @@
 # fast-permute
-A fast python/rust tool for creating permutations of alphanumerics
+A fast tool for creating permutations of alphanumerics
 
 ## What it does
 If you have an input file containing:
@@ -30,34 +30,14 @@ Use the rust version (permute.rs). Create a file with all the characters you'd l
 
 `./permute in.txt`
 
-For example, an input file called "foo" containing the following:
-
-```
-abc
-123
-```
-
-Will produce:
-```
-abc
-bac
-cab
-acb
-bca
-cba
-123
-213
-312
-132
-231
-321
-```
 
 ## Performance
 
-When I first started creating this tool, I was generating about 100M of output in 5s on my MBP running on a nearly dead battery. Currently, the code clocks in at 1.4G written in 5s on the same laptop. This is a list of the things that worked and didn't work.
+When I first started creating this tool, I was generating about 100M of output in 5s on my MBP running on a nearly dead battery. Currently, the rust version clocks in at 579 263 532 permutations written in 5s on the same laptop. This is a list of the things that worked and didn't work.
 
 ### What worked
+
+I started out writing it in python, I knew it would be slower than a compiled language but I wanted an excuse to dig into Python performance. I also initially tracked the amount of data I wrote to disk, and later moved to number of permutations.
 
 #### pypy
 
@@ -94,6 +74,8 @@ After reading https://www.reddit.com/r/unix/comments/6gxduc/how_is_gnu_yes_so_fa
 
 This gave a 1.3X speedup on the pypy3 best speed from above.
 
+Later, copying atom's hashcat approach, I changed to a buffer based on the number of bytes it contained, rather than the number of permutations.
+
 #### Multiprocessing
 
 Multithreading was a complete disaster, multiprocessing worked well.
@@ -103,6 +85,8 @@ This presented three problems, the first was “what work do I spawn in a differ
 I didn’t handle the “how do I write to one file” and instead wrote to multiple files, then cat then together (aka a hack).
 
 This gives another 4.4X speedup on top of the pypy and handbuffering speedups. Unbuffered, this still gives a 2.8X speedup.
+
+However, this only worked because I was creating permutations of different sizes. At the core of the problem, creating  permutations of a fixed length, this provided no speedups.
 
 #### Quickperm, Pools & Stdout
 
@@ -117,6 +101,20 @@ The problem was, if I wanted to do multiple lengths like the original permute, I
 Finally, I tested writing to stdout rather than to multiple individual files for multiple lengths. I like the file approach, because I can generate the permutations once, then use the different lengths as I need them later. But, we want speed! Switching to stdout provided an additional 1.4x speedup!
 
 All in, for a fixed length of 12 and the '0123456789ab' charset, I got a speedup 7.2x over my previous approach (I don't think that number's a coincidence for an i7)! And for multiple lengths, I got a 2x speedup over my previous approach!
+
+#### Rust
+
+Rust wasn't an automatic advantage, in fact, my first implementation, with buffering and using quickperm was *much* slower. However, after @scriptjunkie1 pointed out that if I used native byte instead of higher order objects, things were much faster https://twitter.com/scriptjunkie1/status/1240274976852316160.
+
+In particular, my original code introduced several locks, clones() and memory reallocations, we think.
+
+It ended up faster than the hashcat-utils permute.c implementation, but non-deterministically so. So I ran both for 10s instead of 5s, 30 times, and took the best result from each:
+
+```
+hashcat permute.c 520 836 827 permutations in 10s
+rust quickperm 579 263 532 permutations in 10s
+```
+A 11.2% improvement.
 
 ### What didn't work
 
@@ -168,3 +166,14 @@ pool = ThreadPool(4)
 ```
 
 This was a spectacular failure. Next I tried more vanilla threading as described in https://pymotw.com/2/threading/. It looked so similar to the multiprocess example, that it’s not worth repeating here. Needless to say, it was the *worst* performer of any example with a 10x *slowdown*.
+
+#### Moving to compiled languages
+
+I did a simple implementation of the quickperm algorithm in both golang and rust. They both ended up slower than the python implementation, and much slower than hashcat-utils' permute.c. Here were my stats at the time (after a 5s run into a RAM disk):
+
+golang 12 323 538
+rust 20 391 119
+python 82 940 762
+C 267 823 576
+
+So you don't get an automatic advantage just because it's compiled.
