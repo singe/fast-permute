@@ -1,51 +1,57 @@
 # fast-permute
-A fast python tool for creating permutations of alphanumerics
+A fast python/rust tool for creating permutations of alphanumerics
 
 ## What it does
 If you have an input file containing:
 ```
-1
-2
-3
+abc
+123
 ```
 
 This will produce
 ```
-1
-2
-3
-12
-13
-21
-23
-31
-32
+abc
+bac
+cab
+acb
+bca
+cba
 123
-132
 213
-231
 312
+132
+231
 321
 ```
 
 ## How to run it
 
-I recommend using pypy for maximum speed.
+Use the rust version (permute.rs). Create a file with all the characters you'd like permuted on one line and merely pass that file as an argument:
 
-`pypy3 permute.py <input file> <output base name>`
+`./permute in.txt`
 
-This will create multiple files with the length of the strings in the file prepended e.g. if you give an output base name of "foo", then "7foo" will contain all permutations of length 7.
+For example, an input file called "foo" containing the following:
 
-You can combine all permutations into one file with:
-`cat *<output base name> > <output base name>`
+```
+abc
+123
+```
 
-## Generating specific lengths
-
-You can limit the lengths of output strings generated using permute-minmax.py and passing it the minimum and maximum lengths you'd like to generate. e.g.
-
-`pypy3 permute-minmax.py <input file> <output base name> <min length> <max length>`
-
-As with permute.py you can concatenate the multiple output files together if you'd like to combine them.
+Will produce:
+```
+abc
+bac
+cab
+acb
+bca
+cba
+123
+213
+312
+132
+231
+321
+```
 
 ## Performance
 

@@ -21,30 +21,30 @@
 
 from itertools import permutations
 from sys import argv,stdout
+from os import path
 from multiprocessing import Process
-from signal import signal, SIGTERM
+from signal import signal, SIGTERM, SIGPIPE, SIG_DFL
 from functools import partial
 
 class Worker(Process):
   def signal_term_handler(self, outfile, buf, signal, frame):
-      outfile.write(buf)
-      outfile.close()
+      stdout.write(buf)
       exit(0)
   
   def run(self):
     bufcount = 0
     buf = ""
-    with open(str(i)+argv[2],'w') as outfile:
-      signal(SIGTERM, partial(Worker.signal_term_handler,self,outfile, buf))
-      for x in permutations(start, i):
-        buf += (''.join(x)+'\n')
-        bufcount += 1
-        if bufcount == 18:
-          outfile.write(buf)
-          buf = ""
-          bufcount = 0
-      if buf != "": outfile.write(buf)
-    outfile.close()
+    pth, fil = path.split(argv[2])
+    signal(SIGTERM, partial(Worker.signal_term_handler,self,buf))
+    signal(SIGPIPE,SIG_DFL)
+    for x in permutations(start, i):
+      buf += (''.join(x)+'\n')
+      bufcount += 1
+      if bufcount == 18:
+        stdout.write(buf)
+        buf = ""
+        bufcount = 0
+    if buf != "": stdout.write(buf)
     return
 
 if __name__ == '__main__':
@@ -53,7 +53,7 @@ if __name__ == '__main__':
     del start[-1]
   
   jobs = []
-  for i in range(1,len(start)+1):
+  for i in range(int(argv[2]),int(argv[3])+1):
     p = Worker()
     jobs.append(p)
     p.start()
